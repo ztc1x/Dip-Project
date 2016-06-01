@@ -10,7 +10,6 @@ TRAINVAL_FEATURES_PATH = './features/trainval'
 TEST_FEATURES_PATH = './features/test'
 
 
-
 def onehot(n, k):
     code = np.zeros(n)
     code[k] = 1
@@ -21,7 +20,7 @@ def handle_qq_md5(s):
     if not (s.isalnum() and len(s) == 32):
         print 'illegal qq_md5: %s' % s
         sys.exit(2)
-    return s
+    return np.zeros(shape=(0,))
 
     
 def handle_gender(s):
@@ -97,6 +96,7 @@ def handle_education(s):
         sys.exit(2)
     return onehot(7, education)
 
+
 def handle_profession(s):
     '''
     PROFESSION_UNKNOWN = 0;  // 用户职业未知
@@ -152,14 +152,14 @@ def convert(category, inputPath, outputPath):
         feature_vector.append(handle_profession(fields[6]))
         features.append(np.hstack(feature_vector))
         if category == 'trainval':
-            labels.append(handle_click_num)
+            labels.append(handle_click_num(fields[-1]))
    
     features = np.vstack(features)
     print '%dx%d feature matrix saved to %s' % (features.shape[0], features.shape[1], outputPath + '_features.npy')
     np.save(outputPath + '_features', features)
     if category == 'trainval':
-        labels = np.vstack(labels)
-        print '%dx%d label matrix saved to %s' % (labels.shape[0], labels.shape[1], outputPath + '_labels.npy')
+        labels = np.vstack(labels).flatten()
+        print '%d label vector saved to %s' % (labels.shape[0], outputPath + '_labels.npy')
         np.save(outputPath + '_labels', labels)
 
     
