@@ -2,6 +2,7 @@
 import getopt
 import sys
 import numpy as np 
+import re
 
 
 TRAINVAL_DATA_PATH = './data/train11w.data'
@@ -121,11 +122,69 @@ def handle_profession(s):
 
 
 def handle_creative_id(s):
-    '''
+    return np.zeros(shape=(0, ))
     
-    '''
-    pass
+ 
+def handle_category_id(s):
+    return np.zeros(shape=(0, ))
+    
+    
+def handle_series_id(s):
+    return np.zeros(shape=(0, ))
+    
+    
+def handle_advertiser_id(s):
+    return np.zeros(shape=(0, ))
 
+
+def handle_product_type(s):
+    '''
+    see producttype.png
+    '''
+    product_type = int(s)
+    if not (product_type in (1000, 10001) or 1 <= product_type <= 34):
+        print 'illegal product_type: %s' % s
+        #return None
+        sys.exit(2)
+    if product_type >= 1000:
+        product_type -= (1000 - 35)
+    return onehot(36, product_type - 1)
+
+
+def handle_product_id(s):
+    return np.zeros(shape=(0, ))
+    
+    
+def handle_image_url(s):
+    return np.zeros(shape=(0, ))
+
+
+def handle_page_url(s):
+    return np.zeros(shape=(0, ))
+        
+
+def handle_imp_time(s):
+    imp_time = int(s)
+    if not (0 <= imp_time <= 1467302400):
+        print 'illegal imp_time: %s' % s
+        sys.exit(2)
+    return np.zeros(shape=(0, ))
+
+
+def handle_pos_id(s):
+    '''
+    288235913187546319
+    72063131073762511
+    144120725111690447
+    216178319149618383]
+    '''
+    pos_id = int(s)
+    values = [288235913187546319, 72063131073762511, 144120725111690447, 216178319149618383]
+    if pos_id not in values:
+        print 'illegal pos_id: %s' % s
+        sys.exit(2)
+    return onehot(4, values.index(pos_id))
+        
 
 def handle_click_num(s):
     click_num = int(s)
@@ -139,10 +198,17 @@ def convert(category, inputPath, outputPath):
     print 'converting ' + inputPath
     features = []
     labels = [] if category == 'trainval' else None
+    urlReg = re.compile(r"""(?i)\b((?:https?:(?:/{1,3}|[a-z0-9%])|[a-z0-9.\-]+[.](?:com|net|org|edu|gov|mil|aero|asia|biz|cat|coop|info|int|jobs|mobi|museum|name|post|pro|tel|travel|xxx|ac|ad|ae|af|ag|ai|al|am|an|ao|aq|ar|as|at|au|aw|ax|az|ba|bb|bd|be|bf|bg|bh|bi|bj|bm|bn|bo|br|bs|bt|bv|bw|by|bz|ca|cc|cd|cf|cg|ch|ci|ck|cl|cm|cn|co|cr|cs|cu|cv|cx|cy|cz|dd|de|dj|dk|dm|do|dz|ec|ee|eg|eh|er|es|et|eu|fi|fj|fk|fm|fo|fr|ga|gb|gd|ge|gf|gg|gh|gi|gl|gm|gn|gp|gq|gr|gs|gt|gu|gw|gy|hk|hm|hn|hr|ht|hu|id|ie|il|im|in|io|iq|ir|is|it|je|jm|jo|jp|ke|kg|kh|ki|km|kn|kp|kr|kw|ky|kz|la|lb|lc|li|lk|lr|ls|lt|lu|lv|ly|ma|mc|md|me|mg|mh|mk|ml|mm|mn|mo|mp|mq|mr|ms|mt|mu|mv|mw|mx|my|mz|na|nc|ne|nf|ng|ni|nl|no|np|nr|nu|nz|om|pa|pe|pf|pg|ph|pk|pl|pm|pn|pr|ps|pt|pw|py|qa|re|ro|rs|ru|rw|sa|sb|sc|sd|se|sg|sh|si|sj|Ja|sk|sl|sm|sn|so|sr|ss|st|su|sv|sx|sy|sz|tc|td|tf|tg|th|tj|tk|tl|tm|tn|to|tp|tr|tt|tv|tw|tz|ua|ug|uk|us|uy|uz|va|vc|ve|vg|vi|vn|vu|wf|ws|ye|yt|yu|za|zm|zw)/)(?:[^\s()<>{}\[\]]+|\([^\s()]*?\([^\s()]+\)[^\s()]*?\)|\([^\s]+?\))+(?:\([^\s()]*?\([^\s()]+\)[^\s()]*?\)|\([^\s]+?\)|[^\s`!()\[\]{};:'".,<>?«»“”‘’])|(?:(?<!@)[a-z0-9]+(?:[.\-][a-z0-9]+)*[.](?:com|net|org|edu|gov|mil|aero|asia|biz|cat|coop|info|int|jobs|mobi|museum|name|post|pro|tel|travel|xxx|ac|ad|ae|af|ag|ai|al|am|an|ao|aq|ar|as|at|au|aw|ax|az|ba|bb|bd|be|bf|bg|bh|bi|bj|bm|bn|bo|br|bs|bt|bv|bw|by|bz|ca|cc|cd|cf|cg|ch|ci|ck|cl|cm|cn|co|cr|cs|cu|cv|cx|cy|cz|dd|de|dj|dk|dm|do|dz|ec|ee|eg|eh|er|es|et|eu|fi|fj|fk|fm|fo|fr|ga|gb|gd|ge|gf|gg|gh|gi|gl|gm|gn|gp|gq|gr|gs|gt|gu|gw|gy|hk|hm|hn|hr|ht|hu|id|ie|il|im|in|io|iq|ir|is|it|je|jm|jo|jp|ke|kg|kh|ki|km|kn|kp|kr|kw|ky|kz|la|lb|lc|li|lk|lr|ls|lt|lu|lv|ly|ma|mc|md|me|mg|mh|mk|ml|mm|mn|mo|mp|mq|mr|ms|mt|mu|mv|mw|mx|my|mz|na|nc|ne|nf|ng|ni|nl|no|np|nr|nu|nz|om|pa|pe|pf|pg|ph|pk|pl|pm|pn|pr|ps|pt|pw|py|qa|re|ro|rs|ru|rw|sa|sb|sc|sd|se|sg|sh|si|sj|Ja|sk|sl|sm|sn|so|sr|ss|st|su|sv|sx|sy|sz|tc|td|tf|tg|th|tj|tk|tl|tm|tn|to|tp|tr|tt|tv|tw|tz|ua|ug|uk|us|uy|uz|va|vc|ve|vg|vi|vn|vu|wf|ws|ye|yt|yu|za|zm|zw)\b/?(?!@)))""")
     
     for (i, line) in enumerate(open(inputPath)):
+        line = line.strip()
         feature_vector = []
-        fields = line.strip().split()
+        fields = line.split()
+        urlIndice = []
+        for (i, s) in enumerate(fields):
+            if urlReg.match(s) != None:
+                urlIndice.append(i)
+        assert len(urlIndice) <= 2
         feature_vector.append(handle_qq_md5(fields[0]))
         feature_vector.append(handle_gender(fields[1]))
         feature_vector.append(handle_year(fields[2]))
@@ -150,6 +216,16 @@ def convert(category, inputPath, outputPath):
         feature_vector.append(handle_marriage_status(fields[4]))
         feature_vector.append(handle_education(fields[5]))
         feature_vector.append(handle_profession(fields[6]))
+        feature_vector.append(handle_creative_id(fields[7]))
+        feature_vector.append(handle_category_id(fields[8]))
+        feature_vector.append(handle_series_id(fields[9]))
+        feature_vector.append(handle_advertiser_id(fields[10]))
+        feature_vector.append(handle_product_type(fields[11]))
+        feature_vector.append(handle_product_id(fields[12] if urlIndice[0] != 12 else ''))
+        feature_vector.append(handle_image_url(fields[urlIndice[0]]))
+        feature_vector.append(handle_page_url(fields[urlIndice[1]] if len(urlIndice) > 1 else ''))
+        feature_vector.append(handle_imp_time(fields[-3] if category == 'trainval' else fields[-2]))
+        feature_vector.append(handle_pos_id(fields[-2] if category == 'trainval' else fields[-1]))
         features.append(np.hstack(feature_vector))
         if category == 'trainval':
             labels.append(handle_click_num(fields[-1]))
@@ -170,4 +246,3 @@ if __name__ == '__main__':
 
     convert('trainval', TRAINVAL_DATA_PATH, TRAINVAL_FEATURES_PATH)
     convert('test', TEST_DATA_PATH, TEST_FEATURES_PATH)
-       
