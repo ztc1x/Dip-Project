@@ -3,6 +3,11 @@ import getopt
 import sys
 import numpy as np 
 import re
+from progressbar import  Bar, Percentage, ProgressBar
+import pickle
+from datetime import datetime
+import cPickle
+from scipy.sparse import csr_matrix
 
 
 TRAINVAL_DATA_PATH = './data/train11w.data'
@@ -10,10 +15,21 @@ TEST_DATA_PATH = './data/test5w.data'
 TRAINVAL_FEATURES_PATH = './features/trainval' 
 TEST_FEATURES_PATH = './features/test'
 
+qq_md5_list = pickle.load(open('qq_md5.pickle', 'rb'))
+creative_id_list = pickle.load(open('creative_id.pickle', 'rb'))
+category_id_list = pickle.load(open('category_id.pickle', 'rb'))
+category_id_level_1_list = pickle.load(open('category_id_level_1.pickle', 'rb'))
+category_id_level_2_list = pickle.load(open('category_id_level_2.pickle', 'rb'))
+category_id_level_3_list = pickle.load(open('category_id_level_3.pickle', 'rb'))
+advertiser_id_list = pickle.load(open('advertiser_id.pickle', 'rb'))
+product_id_list = pickle.load(open('product_id.pickle', 'rb'))
+series_id_list = pickle.load(open('series_id.pickle', 'rb'))
+
 
 def onehot(n, k):
     code = np.zeros(n)
-    code[k] = 1
+    if 0 <= k < n:
+        code[k] = 1
     return code
     
         
@@ -21,28 +37,37 @@ def handle_qq_md5(s):
     if not (s.isalnum() and len(s) == 32):
         print 'illegal qq_md5: %s' % s
         sys.exit(2)
-    return np.zeros(shape=(0,))
+    
+    return np.zeros(shape=(1,))
 
     
 def handle_gender(s):
     '''
-    GENDER_UNKNOWN = 0;  // 性别未知
     GENDER_MALE = 1;  // 男
     GENDER_FEMALE = 2;  // 女
     '''
     gender = int(s)
-    if gender not in (0, 1, 2):
+    if gender not in (1, 2):
         print 'illegal gender: %s' % s
         sys.exit(2)
-    return onehot(3, gender)
+    return onehot(2, gender - 1)
     
     
 def handle_year(s):
     year = int(s)
-    if not 1900 <= year <= 2016:
+    if not 1956 <= year < 2013:
         print 'illegal year: %s' % s
         sys.exit(2)
-    return year
+    age = None
+    if 2001 < year:  #child
+        age = 0
+    elif 1995 < year:  #teenage
+        age = 1
+    elif 1985 < year:  #young
+        age = 2
+    else:
+        age = 3
+    return onehot(4, age)
 
 
 def handle_surf_scene(s):
@@ -62,7 +87,6 @@ def handle_surf_scene(s):
 
 def handle_marriage_status(s):
     '''
-    MARRIAGE_STATUS_UNKNOWN = 0;  // 未知
     MARRIAGE_STATUS_SINGLE = 1;  // 单身
     MARRIAGE_STATUS_HAVE_BABY = 2;  // 育儿
     MARRIAGE_STATUS_NEWLY_WEDS = 3;  // 新婚
@@ -75,15 +99,14 @@ def handle_marriage_status(s):
     MARRIAGE_STATUS_DIVORCED = 10;  // 离异
     '''
     marriage_status = int(s)
-    if not (0 <= marriage_status <= 10):
+    if not (1 <= marriage_status <= 10):
         print 'illegal marriage_status: %s' % s
         sys.exit(2)
-    return onehot(11, marriage_status)
+    return onehot(10, marriage_status - 1)
 
 
 def handle_education(s):
     '''
-    EDUCATION_UNKNOWN = 0;  // 学历未知
     EDUCATION_DOCTOR = 1;  // 博士
     EDUCATION_MASTER = 2;  // 硕士
     EDUCATION_COLLEGE = 3;  // 大学生
@@ -92,15 +115,14 @@ def handle_education(s):
     EDUCATION_PRIMARY_SCHOOL = 6;  // 小学
     '''
     education = int(s)
-    if not (0 <= education <= 6):
+    if not (1 <= education <= 6):
         print 'illegal education: %s' % s
         sys.exit(2)
-    return onehot(7, education)
+    return onehot(6, education - 1)
 
 
 def handle_profession(s):
     '''
-    PROFESSION_UNKNOWN = 0;  // 用户职业未知
     PROFESSION_COMPUTER = 1;  // 计算机/互联网/通信/电子
     PROFESSION_MARKETING = 2;  // 销售/客服/技术支持
     PROFESSION_FINANCE = 3;  // 会计/金融/银行/保险
@@ -115,26 +137,53 @@ def handle_profession(s):
     PROFESSION_ENGINEERING = 12;  // 工程行业
     '''
     profession = int(s)
-    if not (0 <= profession <= 12):
+    if not (1 <= profession <= 12):
         print 'illegal profession: %s' % s
         sys.exit(2)
-    return onehot(13, profession)
+    return onehot(12, profession - 1)
 
 
 def handle_creative_id(s):
-    return np.zeros(shape=(0, ))
+    creative_id = int(s)
+    return onehot(len(creative_id_list), creative_id_list.index(creative_id))
     
  
 def handle_category_id(s):
-    return np.zeros(shape=(0, ))
-    
+    category_id = int(s)
+    if not (1 <= category_id <= 40521):
+        print 'illegal category_id: %s' % s
+        sys.exit(2)   
+    level_1_id = None
+    level_2_id = None
+    level_3_id = None   
+    if category_id < 100:
+        level_1_id = category_id
+    elif category_id < 10000:
+        level_1_id = int(s[:-2])
+        level_2_id = category_id
+    else:
+        level_1_id = 4
+        level_2_id = int(s[:-2])
+        level_3_id = category_id
+    level_3_forbidden = 1 if level_1_id == 33 else 0
+    level_2_forbidden = 1 if level_1_id in (18, 19, 20) or level_2_id in (201, 204, 205, 604, 607, 608, 609, 611, 1106) or level_3_id in (40302, 40501, 40514) else 0
+    level_1_forbidden = 1 if level_2_forbidden or level_1_id == 21 or level_2_id in (207, 805, 1302) else 0
+    forbidden = np.asarray([level_1_forbidden, level_2_forbidden, level_3_forbidden])
+    return np.hstack((forbidden, 
+                      onehot(len(category_id_level_1_list), category_id_level_1_list.index(level_1_id)),
+                      onehot(len(category_id_level_2_list), category_id_level_2_list.index(level_2_id) if level_2_id else -1),
+                      onehot(len(category_id_level_3_list), category_id_level_3_list.index(level_3_id) if level_3_id else -1)
+                      ))
+
     
 def handle_series_id(s):
-    return np.zeros(shape=(0, ))
+    series_id = int(s)
+    return onehot(len(series_id_list), series_id_list.index(series_id))
     
     
 def handle_advertiser_id(s):
-    return np.zeros(shape=(0, ))
+    advertiser_id = int(s)
+    return onehot(len(advertiser_id_list), advertiser_id_list.index(advertiser_id))
 
 
 def handle_product_type(s):
@@ -152,15 +201,19 @@ def handle_product_type(s):
 
 
 def handle_product_id(s):
-    return np.zeros(shape=(0, ))
+    product_id = int(s) if len(s) > 0 else -1
+    if product_id != -1:
+        return onehot(len(product_id_list), product_id_list.index(product_id))
+    else:
+        return onehot(len(product_id_list), -1)
     
     
 def handle_image_url(s):
-    return np.zeros(shape=(0, ))
+    return np.zeros(shape=(1,))
 
 
 def handle_page_url(s):
-    return np.zeros(shape=(0, ))
+    return np.zeros(shape=(1,))
         
 
 def handle_imp_time(s):
@@ -168,7 +221,8 @@ def handle_imp_time(s):
     if not (0 <= imp_time <= 1467302400):
         print 'illegal imp_time: %s' % s
         sys.exit(2)
-    return np.zeros(shape=(0, ))
+    dt = datetime.fromtimestamp(imp_time)
+    return onehot(24, dt.hour)
 
 
 def handle_pos_id(s):
@@ -191,19 +245,30 @@ def handle_click_num(s):
     if click_num not in (0, 1):
         print 'illegal click_num: %s' % s
         sys.exit(2) 
-    return click_num   
+    click_num = -1 if click_num == 0 else click_num
+    return np.asarray([click_num])   
 
 
+def audit(fields):
+    if np.abs(int(fields[8])) > 50000:
+        return False
+    return True
+    
+    
 def convert(category, inputPath, outputPath):
     print 'converting ' + inputPath
     features = []
     labels = [] if category == 'trainval' else None
     urlReg = re.compile(r"""(?i)\b((?:https?:(?:/{1,3}|[a-z0-9%])|[a-z0-9.\-]+[.](?:com|net|org|edu|gov|mil|aero|asia|biz|cat|coop|info|int|jobs|mobi|museum|name|post|pro|tel|travel|xxx|ac|ad|ae|af|ag|ai|al|am|an|ao|aq|ar|as|at|au|aw|ax|az|ba|bb|bd|be|bf|bg|bh|bi|bj|bm|bn|bo|br|bs|bt|bv|bw|by|bz|ca|cc|cd|cf|cg|ch|ci|ck|cl|cm|cn|co|cr|cs|cu|cv|cx|cy|cz|dd|de|dj|dk|dm|do|dz|ec|ee|eg|eh|er|es|et|eu|fi|fj|fk|fm|fo|fr|ga|gb|gd|ge|gf|gg|gh|gi|gl|gm|gn|gp|gq|gr|gs|gt|gu|gw|gy|hk|hm|hn|hr|ht|hu|id|ie|il|im|in|io|iq|ir|is|it|je|jm|jo|jp|ke|kg|kh|ki|km|kn|kp|kr|kw|ky|kz|la|lb|lc|li|lk|lr|ls|lt|lu|lv|ly|ma|mc|md|me|mg|mh|mk|ml|mm|mn|mo|mp|mq|mr|ms|mt|mu|mv|mw|mx|my|mz|na|nc|ne|nf|ng|ni|nl|no|np|nr|nu|nz|om|pa|pe|pf|pg|ph|pk|pl|pm|pn|pr|ps|pt|pw|py|qa|re|ro|rs|ru|rw|sa|sb|sc|sd|se|sg|sh|si|sj|Ja|sk|sl|sm|sn|so|sr|ss|st|su|sv|sx|sy|sz|tc|td|tf|tg|th|tj|tk|tl|tm|tn|to|tp|tr|tt|tv|tw|tz|ua|ug|uk|us|uy|uz|va|vc|ve|vg|vi|vn|vu|wf|ws|ye|yt|yu|za|zm|zw)/)(?:[^\s()<>{}\[\]]+|\([^\s()]*?\([^\s()]+\)[^\s()]*?\)|\([^\s]+?\))+(?:\([^\s()]*?\([^\s()]+\)[^\s()]*?\)|\([^\s]+?\)|[^\s`!()\[\]{};:'".,<>?«»“”‘’])|(?:(?<!@)[a-z0-9]+(?:[.\-][a-z0-9]+)*[.](?:com|net|org|edu|gov|mil|aero|asia|biz|cat|coop|info|int|jobs|mobi|museum|name|post|pro|tel|travel|xxx|ac|ad|ae|af|ag|ai|al|am|an|ao|aq|ar|as|at|au|aw|ax|az|ba|bb|bd|be|bf|bg|bh|bi|bj|bm|bn|bo|br|bs|bt|bv|bw|by|bz|ca|cc|cd|cf|cg|ch|ci|ck|cl|cm|cn|co|cr|cs|cu|cv|cx|cy|cz|dd|de|dj|dk|dm|do|dz|ec|ee|eg|eh|er|es|et|eu|fi|fj|fk|fm|fo|fr|ga|gb|gd|ge|gf|gg|gh|gi|gl|gm|gn|gp|gq|gr|gs|gt|gu|gw|gy|hk|hm|hn|hr|ht|hu|id|ie|il|im|in|io|iq|ir|is|it|je|jm|jo|jp|ke|kg|kh|ki|km|kn|kp|kr|kw|ky|kz|la|lb|lc|li|lk|lr|ls|lt|lu|lv|ly|ma|mc|md|me|mg|mh|mk|ml|mm|mn|mo|mp|mq|mr|ms|mt|mu|mv|mw|mx|my|mz|na|nc|ne|nf|ng|ni|nl|no|np|nr|nu|nz|om|pa|pe|pf|pg|ph|pk|pl|pm|pn|pr|ps|pt|pw|py|qa|re|ro|rs|ru|rw|sa|sb|sc|sd|se|sg|sh|si|sj|Ja|sk|sl|sm|sn|so|sr|ss|st|su|sv|sx|sy|sz|tc|td|tf|tg|th|tj|tk|tl|tm|tn|to|tp|tr|tt|tv|tw|tz|ua|ug|uk|us|uy|uz|va|vc|ve|vg|vi|vn|vu|wf|ws|ye|yt|yu|za|zm|zw)\b/?(?!@)))""")
     
+    pbar = ProgressBar(widgets=[Percentage(), Bar()], maxval=len(list(open(inputPath)))).start()
     for (i, line) in enumerate(open(inputPath)):
+        pbar.update(i)
         line = line.strip()
         feature_vector = []
         fields = line.split()
+        if not audit(fields):
+            continue
         urlIndice = []
         for (i, s) in enumerate(fields):
             if urlReg.match(s) != None:
@@ -230,17 +295,16 @@ def convert(category, inputPath, outputPath):
         if category == 'trainval':
             labels.append(handle_click_num(fields[-1]))
    
+    print ''
     features = np.vstack(features)
-    print '%dx%d feature matrix saved to %s' % (features.shape[0], features.shape[1], outputPath + '_features.npy')
-    np.save(outputPath + '_features', features)
+    print '%dx%d feature matrix saved to %s' % (features.shape[0], features.shape[1], outputPath + '_features.cPickle')
+    cPickle.dump(csr_matrix(features), open(outputPath + '_features.cPickle', 'wb'))
+    del features
     if category == 'trainval':
         labels = np.vstack(labels).flatten()
-        print '%d label vector saved to %s' % (labels.shape[0], outputPath + '_labels.npy')
-        np.save(outputPath + '_labels', labels)
-
-    
+        print '%d label vector saved to %s' % (labels.shape[0], outputPath + '_labels.cPickle')
+        cPickle.dump(labels, open(outputPath + '_labels.cPickle', 'wb'))
         
-
 
 if __name__ == '__main__':
 
