@@ -1,10 +1,10 @@
 # Dip-Project
 
 
-首先将`test5w.data`和`train11w.data`放入./data文件夹  
+首先将`test5w.data`和`train11w.data`放入`./data`文件夹  
  
 ```
-python preprocess.py
+python preprocess.py  #产生数据并保存到./features文件夹
 python train.py
 ```
 
