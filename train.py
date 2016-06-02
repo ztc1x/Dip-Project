@@ -3,6 +3,7 @@ from sklearn import svm
 from sklearn import cross_validation
 from sklearn.metrics import accuracy_score
 import cPickle
+import pickle
 
 X_trainval = cPickle.load(open('./features/trainval_features.cPickle', 'rb'))
 y_trainval = np.load('./features/trainval_labels.cPickle')
@@ -15,3 +16,6 @@ print 'Training Accuracy: %f' % accuracy_score(y_trainval, model.predict(X_train
 fold = 4
 scores = cross_validation.cross_val_score(model, X_trainval, y_trainval, cv=fold)
 print("%d-Fold Validatoin Accuracy: %0.3f (+/- %0.3f)" % (fold, scores.mean(), scores.std() * 2))
+
+pickle.dump(model, open('model.pickle', 'wb'))
+print 'model saved to ./model.pickle'
