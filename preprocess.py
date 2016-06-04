@@ -8,6 +8,7 @@ import pickle
 from datetime import datetime
 import cPickle
 from scipy.sparse import csr_matrix
+import os
 
 
 TRAINVAL_DATA_PATH = './data/train11w.data'
@@ -322,5 +323,6 @@ def convert(category, inputPath, outputPath):
 
 if __name__ == '__main__':
 
+    os.system('mkdir features')
     convert('trainval', TRAINVAL_DATA_PATH, TRAINVAL_FEATURES_PATH)
     convert('test', TEST_DATA_PATH, TEST_FEATURES_PATH)
