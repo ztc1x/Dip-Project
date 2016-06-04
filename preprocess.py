@@ -145,6 +145,10 @@ def handle_profession(s):
 
 def handle_creative_id(s):
     creative_id = int(s)
+    if creative_id not in creative_id_list:
+        print 'illegal creative_id %s' % s
+        return
+        sys.exit(2)
     return onehot(len(creative_id_list), creative_id_list.index(creative_id))
     
  
@@ -178,11 +182,19 @@ def handle_category_id(s):
     
 def handle_series_id(s):
     series_id = int(s)
+    if series_id not in series_id_list:
+        print 'illegal series_id %s' % s
+        return
+        sys.exit(2)
     return onehot(len(series_id_list), series_id_list.index(series_id))
     
     
 def handle_advertiser_id(s):
     advertiser_id = int(s)
+    if advertiser_id not in advertiser_id_list:
+        print 'illegal advertiser_id %s' % s
+        return
+        sys.exit(2)
     return onehot(len(advertiser_id_list), advertiser_id_list.index(advertiser_id))
 
 
@@ -203,6 +215,10 @@ def handle_product_type(s):
 def handle_product_id(s):
     product_id = int(s) if len(s) > 0 else -1
     if product_id != -1:
+        if product_id not in product_id_list:
+            print 'illegal product_id %s' % s
+            return
+            sys.exit(2)
         return onehot(len(product_id_list), product_id_list.index(product_id))
     else:
         return onehot(len(product_id_list), -1)
@@ -251,8 +267,7 @@ def handle_click_num(s):
 
 def audit(fields):
     if np.abs(int(fields[8])) > 50000:
-        return False
-    return True
+        fields[8] = '1'
     
     
 def convert(category, inputPath, outputPath):
@@ -267,8 +282,7 @@ def convert(category, inputPath, outputPath):
         line = line.strip()
         feature_vector = []
         fields = line.split()
-        if not audit(fields):
-            continue
+        audit(fields)
         urlIndice = []
         for (i, s) in enumerate(fields):
             if urlReg.match(s) != None:
