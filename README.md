@@ -22,9 +22,10 @@ progressbar
 ## 文件
 
 ```
-preprocess.py  #产生数据并保存到./features文件夹  
-train.py       #训练线性SVM  
-X.pickle       #特征X所有可能的取值组成的有序列表，被用于onehot encoding  
+preprocess.py   #产生数据并保存到./features文件夹  
+train.py        #训练线性SVM  
+X.pickle        #特征X所有可能的取值组成的有序列表，被用于onehot encoding  
+predictions.txt #测试集上的预测结果
 ```
 
 
