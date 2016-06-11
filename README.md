@@ -44,7 +44,10 @@ DIP_ad_format.pdf中所述的每个特征`X`在`preprocess.py`中有一个对应
 我们所提交的baseline模型中所用的特征提取方法几乎全是onehot encodeing，除了以下几处特殊处理： 
 
 ```
-qq_md5:             不用  
+qq_md5:             不用 
+image_url:          不用
+page_url:           不用
+标题及描述:           不用
 category_id:        从MS Excel文档中提取三个层级的category_id，以及这类广告是否被允许出现在一、二、三类广告位上  
 year:               根据出生日期计算现在的年龄，并且分到小孩、青年、中年、老年四个类别中  
 handle_imp_time:    转化为具体的日期时间后只保留小时  
