@@ -9,6 +9,9 @@ from datetime import datetime
 import cPickle
 from scipy.sparse import csr_matrix
 import os
+from jieba import posseg
+from collections import OrderedDict
+from time import clock
 
 
 TRAINVAL_DATA_PATH = './data/train11w.data'
@@ -25,6 +28,13 @@ category_id_level_3_list = pickle.load(open('category_id_level_3.pickle', 'rb'))
 advertiser_id_list = pickle.load(open('advertiser_id.pickle', 'rb'))
 product_id_list = pickle.load(open('product_id.pickle', 'rb'))
 series_id_list = pickle.load(open('series_id.pickle', 'rb'))
+
+# Variables for processing ad text
+common_word_list = []
+punctuation_list = []
+max_info_ratio = 0
+word_code_list = []
+punctuation_code_list = []
 
 
 def onehot(n, k):
@@ -265,6 +275,131 @@ def handle_click_num(s):
     click_num = -1 if click_num == 0 else click_num
     return np.asarray([click_num])   
 
+def dedupe_list(l):
+    return list(OrderedDict.fromkeys(l))
+
+def preprocess_ad_text():
+    global common_word_list
+    global punctuation_list
+    global max_info_ratio
+    global word_code_list
+    global punctuation_code_list
+    start_time = clock()
+    f = open(TRAINVAL_DATA_PATH, 'r')
+    train_ad_text = f.read()
+    entries = train_ad_text.split('\n')
+    f.close()
+    f = open(TEST_DATA_PATH, 'r')
+    test_ad_text = f.read()
+    entries += test_ad_text.split('\n')
+    f.close()
+    text_list = []
+    for entry in entries:
+        if len(entry) > 15:
+            text_list.append(entry.split('\t')[15])
+    text_list = dedupe_list(text_list)
+    segged_texts = []
+    word_cnt_dict = dict()
+    for text in text_list:
+        words = posseg.cut(text)
+        segged_text = []
+        for word, flag in words:
+            key = word + '||' + flag
+            if key in word_cnt_dict:
+                word_cnt_dict[key] += 1
+            else:
+                word_cnt_dict[key] = 1
+            segged_text.append((word, flag))
+        segged_texts.append(segged_text)
+    word_tuples = []
+    for key in word_cnt_dict.keys():
+        word_flag = key.split('||')
+        word_tuples.append((word_flag[0], word_flag[1], word_cnt_dict[key]))
+    init_sorted_words = sorted(word_tuples, key=lambda word:word[2])
+    sorted_words = []
+    for item in init_sorted_words:
+        if item[2] > 1:
+            sorted_words.append(item)
+    common_cnt = sorted_words[len(sorted_words)/2][2]
+    common_word_list = []
+    init_puntuation_list = []
+    for item in sorted_words:
+        if item[2] == common_cnt and item[1] != 'x':
+            common_word_list.append((item[0], item[1]))
+        if (item[1] == 'x' or item[1] == 'w') and item[2] > 3:
+            punctuation_list.append((item[0], item[1]))
+    print len(common_word_list)
+    for segged_text in segged_texts:
+        word_code = ''
+        for common_word in common_word_list:
+            if common_word in segged_text:
+                word_code += '1'
+            else:
+                word_code += '0'
+        word_code_list.append(word_code)
+        punctuation_code = ''
+        for punctuation in punctuation_list:
+            if punctuation in segged_text:
+                punctuation_code += '1'
+            else:
+                punctuation_code += '0'
+        punctuation_code_list.append(punctuation_code)
+    word_code_list = dedupe_list(word_code_list)
+    punctuation_code_list = dedupe_list(punctuation_code_list)
+    end_time = clock()
+    print '--------------------------------'
+    print 'Preprocessing of ad text done.'
+    print 'Number of distinct ads: ' + str(len(text_list))
+    print 'Number of words: ' + str(len(word_cnt_dict))
+    print 'Number of common words: ' + str(len(common_word_list))
+    print 'Number of word codes: ' + str(len(word_code_list))
+    print 'Number of punctuationcodes: ' + str(len(punctuation_code_list))
+    print 'Time elapsed: ' + str(end_time - start_time) + 's'
+    print '--------------------------------'
+
+
+def handle_ad_text(s):
+    global common_word_list
+    global punctuation_list
+    global max_info_word_cnt
+    global word_code_list
+    global punctuation_code_list
+    words = posseg.cut(s)
+    segged_text = []
+    for word, flag in words:
+        segged_text.append((word, flag))
+    word_code = ''
+    punctuation_code = ''
+    for common_word in common_word_list:
+        if common_word in segged_text:
+            word_code += '1'
+        else:
+            word_code += '0'
+    for punctuation in punctuation_list:
+        if punctuation in segged_text:
+            punctuation_code += '1'
+        else:
+            punctuation_code += '0'
+    info_cnt = 0
+    for item in segged_text:
+        if 'n' in item[1] or 'v' in item[1]:
+            info_cnt += 1
+    info_ratio = 50 * info_cnt / len(segged_text)
+    #feature_vector = []
+    #f1 = onehot(len(word_code_list), word_code_list.index(word_code))
+    #f2 = onehot(len(punctuation_list), punctuation_code_list.index(punctuation_code))
+    v = np.zeros(len(word_code_list) + len(punctuation_code_list) + 51)
+    if word_code in word_code_list:
+        v[word_code_list.index(word_code)] = 1
+    else:
+        print 'anomaly' + s
+    if punctuation_code in punctuation_code_list:
+        v[punctuation_code_list.index(punctuation_code) + len(word_code_list)] = 1
+    else:
+        print 'anomaly' + s
+    v[len(punctuation_code_list) + len(word_code_list) + info_ratio] = 1
+    return v
+
 
 def audit(fields):
     if np.abs(int(fields[8])) > 50000:
@@ -282,30 +417,31 @@ def convert(category, inputPath, outputPath):
         pbar.update(i)
         line = line.strip()
         feature_vector = []
-        fields = line.split()
+        fields = line.split('\t')
         audit(fields)
         urlIndice = []
         for (i, s) in enumerate(fields):
             if urlReg.match(s) != None:
                 urlIndice.append(i)
         assert len(urlIndice) <= 2
-        feature_vector.append(handle_qq_md5(fields[0]))
-        feature_vector.append(handle_gender(fields[1]))
-        feature_vector.append(handle_year(fields[2]))
-        feature_vector.append(handle_surf_scene(fields[3]))
-        feature_vector.append(handle_marriage_status(fields[4]))
-        feature_vector.append(handle_education(fields[5]))
-        feature_vector.append(handle_profession(fields[6]))
-        feature_vector.append(handle_creative_id(fields[7]))
-        feature_vector.append(handle_category_id(fields[8]))
-        feature_vector.append(handle_series_id(fields[9]))
-        feature_vector.append(handle_advertiser_id(fields[10]))
-        feature_vector.append(handle_product_type(fields[11]))
-        feature_vector.append(handle_product_id(fields[12] if urlIndice[0] != 12 else ''))
-        feature_vector.append(handle_image_url(fields[urlIndice[0]]))
-        feature_vector.append(handle_page_url(fields[urlIndice[1]] if len(urlIndice) > 1 else ''))
-        feature_vector.append(handle_imp_time(fields[-3] if category == 'trainval' else fields[-2]))
-        feature_vector.append(handle_pos_id(fields[-2] if category == 'trainval' else fields[-1]))
+        #feature_vector.append(handle_qq_md5(fields[0]))
+        #feature_vector.append(handle_gender(fields[1]))
+        #feature_vector.append(handle_year(fields[2]))
+        #feature_vector.append(handle_surf_scene(fields[3]))
+        #feature_vector.append(handle_marriage_status(fields[4]))
+        #feature_vector.append(handle_education(fields[5]))
+        #feature_vector.append(handle_profession(fields[6]))
+        #feature_vector.append(handle_creative_id(fields[7]))
+        #feature_vector.append(handle_category_id(fields[8]))
+        #feature_vector.append(handle_series_id(fields[9]))
+        #feature_vector.append(handle_advertiser_id(fields[10]))
+        #feature_vector.append(handle_product_type(fields[11]))
+        #feature_vector.append(handle_product_id(fields[12] if urlIndice[0] != 12 else ''))
+        #feature_vector.append(handle_image_url(fields[urlIndice[0]]))
+        feature_vector.append(handle_ad_text(fields[15]))
+        #feature_vector.append(handle_page_url(fields[urlIndice[1]] if len(urlIndice) > 1 else ''))
+        #feature_vector.append(handle_imp_time(fields[-3] if category == 'trainval' else fields[-2]))
+        #feature_vector.append(handle_pos_id(fields[-2] if category == 'trainval' else fields[-1]))
         features.append(np.hstack(feature_vector))
         if category == 'trainval':
             labels.append(handle_click_num(fields[-1]))
@@ -324,5 +460,6 @@ def convert(category, inputPath, outputPath):
 if __name__ == '__main__':
 
     os.system('mkdir features')
+    preprocess_ad_text()
     convert('trainval', TRAINVAL_DATA_PATH, TRAINVAL_FEATURES_PATH)
     convert('test', TEST_DATA_PATH, TEST_FEATURES_PATH)
